@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#006400">
+  <meta name="description" content="CHPS Immunization Tracker - Track child vaccinations for Ghana Health Service">
+  <title>Immunization Tracker</title>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+  <style>
+    /* Ghana Health Service Color Scheme */
+    :root {
+      --ghs-green: #006400;
+      --ghs-dark-green: #004d00;
+      --ghs-light-blue: #f0f8ff;
+      --ghs-white: #ffffff;
+      --ghs-red: #cc0000;
+      --ghs-dark-red: #990000;
+      --ghs-yellow: #ffffcc;
+      --ghs-light-red: #ffcccc;
+      --ghs-light-pink: #ffccff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--ghs-light-blue);
+      line-height: 1.6;
+    }
+
+    h1, h2 {
+      color: var(--ghs-green);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.8rem;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 1.5rem;
+    }
+
+    form {
+      margin-bottom: 20px;
+      background-color: var(--ghs-white);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      color: var(--ghs-green);
+      font-weight: 500;
+    }
+
+    input, select, button {
+      margin-top: 5px;
+      padding: 10px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid var(--ghs-green);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    button {
+      background-color: var(--ghs-green);
+      color: var(--ghs-white);
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: var(--ghs-dark-green);
+    }
+
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: var(--ghs-white);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
+      display: block;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background-color: var(--ghs-green);
+      color: var(--ghs-white);
+      position: sticky;
+      top: 0;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+
+    .highlight-red {
+      background-color: var(--ghs-light-red);
+    }
+
+    .highlight-pink {
+      background-color: var(--ghs-light-pink);
+    }
+
+    .highlight-yellow {
+      background-color: var(--ghs-yellow);
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background-color: white;
+      padding: 25px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 900px;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .close {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      cursor: pointer;
+      color: var(--ghs-green);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 30px;
+      text-align: center;
+      color: var(--ghs-green);
+      padding: 15px 0;
+      border-top: 1px solid #ddd;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      body {
+        padding: 15px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      h2 {
+        font-size: 1.2rem;
+      }
+      
+      .modal-content {
+        width: 95%;
+        padding: 15px;
+      }
+      
+      th, td {
+        padding: 8px;
+        font-size: 0.9rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+      
+      .stats-container {
+        flex-direction: column;
+      }
+      
+      .stat-card {
+        min-width: 100%;
+      }
+      
+      .tab-buttons {
+        flex-wrap: wrap;
+      }
+      
+      .tab-button {
+        margin-bottom: 5px;
+      }
+    }
+
+    /* Booking Form Styles */
+    .booking-form {
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+
+    .vaccine-checkbox {
+      margin-right: 10px;
+    }
+
+    .vaccine-item {
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+
+    /* Stats Cards */
+    .stats-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background-color: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .stat-card h3 {
+      margin-top: 0;
+      color: var(--ghs-green);
+      font-size: 1rem;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--ghs-green);
+    }
+
+    /* Tabs */
+    .tab-container {
+      margin-bottom: 20px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab-button {
+      padding: 10px 15px;
+      background-color: #e0e0e0;
+      border: none;
+      cursor: pointer;
+      margin-right: 5px;
+      border-radius: 4px 4px 0 0;
+      font-size: 0.9rem;
+    }
+
+    .tab-button.active {
+      background-color: var(--ghs-green);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 15px;
+      background-color: white;
+      border-radius: 0 0 4px 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Auth Styles */
+    .auth-container {
+      max-width: 400px;
+      margin: 40px auto;
+      padding: 25px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .auth-toggle {
+      text-align: center;
+      margin-top: 15px;
+      color: var(--ghs-green);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .auth-toggle:hover {
+      color: var(--ghs-dark-green);
+    }
+
+    .user-info {
+      text-align: right;
+      margin-bottom: 15px;
+      color: var(--ghs-green);
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background-color: rgba(0, 100, 0, 0.1);
+      border-radius: 4px;
+    }
+
+    #logoutBtn {
+      background-color: var(--ghs-red);
+      margin-left: 10px;
+      padding: 8px 15px;
+      max-width: 100px;
+    }
+
+    #logoutBtn:hover {
+      background-color: var(--ghs-dark-red);
+    }
+
+    /* App Header */
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* Utility Classes */
+    .hidden {
+      display: none !important;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0,100,0,0.3);
+      border-radius: 50%;
+      border-top-color: var(--ghs-green);
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Action buttons */
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .action-buttons button {
+      max-width: 150px;
+    }
+
+    /* Search box */
+    #search {
+      padding: 10px;
+      margin-bottom: 15px;
+      max-width: 400px;
+    }
+
+    /* Notification */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px;
+      background-color: var(--ghs-green);
+      color: white;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    .notification.error {
+      background-color: var(--ghs-red);
+    }
+
+    .notification.success {
+      background-color: var(--ghs-green);
+    }
+
+    /* Offline indicator */
+    #offlineIndicator {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background-color: #ff6600;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 4px;
+      z-index: 1000;
+      display: none;
+    }
+
+    /* Print styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printSection, #printSection * {
+        visibility: visible;
+      }
+      #printSection {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Offline login message */
+    .offline-login-message {
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 15px;
+      border: 1px solid #ffeeba;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Auth Section -->
+  <div id="authSection">
+    <div class="auth-container" id="loginForm">
+      <h2 class="text-center">Immunization Tracker Login</h2>
+      <form id="loginForm">
+        <label for="loginEmail">Email:</label>
+        <input type="email" id="loginEmail" required autocomplete="username">
+        
+        <label for="loginPassword">Password:</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+        
+        <button type="submit" id="loginBtn">
+          <span id="loginBtnText">Login</span>
+          <span id="loginSpinner" class="loading hidden"></span>
+        </button>
+      </form>
+      <div class="offline-login-message" id="offlineLoginMessage">
+        Note: First login requires internet connection. After first login, you can access your data offline.
+      </div>
+      <div class="auth-toggle" onclick="showRegisterForm()">Don't have an account? Register</div>
+    </div>
+
+    <div class="auth-container hidden" id="registerForm">
+      <h2 class="text-center">Register New Account</h2>
+      <form id="registerForm">
+        <label for="registerEmail">Email:</label>
+        <input type="email" id="registerEmail" required autocomplete="username">
+        
+        <label for="registerPassword">Password (min 6 characters):</label>
+        <input type="password" id="registerPassword" minlength="6" required autocomplete="new-password">
+        
+        <label for="registerFacility">Facility Name:</label>
+        <input type="text" id="registerFacility" required>
+        
+        <button type="submit" id="registerBtn">
+          <span id="registerBtnText">Register</span>
+          <span id="registerSpinner" class="loading hidden"></span>
+        </button>
+      </form>
+      <div class="auth-toggle" onclick="showLoginForm()">Already have an account? Login</div>
+    </div>
+  </div>
+
+  <!-- Main App Content (Hidden until authenticated) -->
+  <div id="appContent" class="hidden">
+    <div class="user-info no-print">
+      <span>
+        Welcome, <span id="userEmail"></span> (<span id="facilityNameDisplay"></span>)
+        <span id="offlineBadge" style="display: none; background-color: #ff6600; color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">OFFLINE</span>
+      </span>
+      <button id="logoutBtn">Logout</button>
+    </div>
+
+    <div class="app-header no-print">
+      <h1>Immunization Tracker</h1>
+      <div id="syncStatus" class="hidden">
+        <span id="syncSpinner" class="loading"></span>
+        <span id="syncText">Syncing...</span>
+      </div>
+    </div>
+
+    <!-- Facility Name Section -->
+    <section id="facility" class="no-print">
+      <h2>Facility Name</h2>
+      <form id="facilityForm">
+        <label for="facilityName">Facility Name:</label>
+        <input type="text" id="facilityName" required>
+        <button type="submit" id="saveFacilityBtn">
+          <span id="saveFacilityBtnText">Save Facility Name</span>
+          <span id="saveFacilitySpinner" class="loading hidden"></span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Stats Section -->
+    <section id="stats" class="no-print">
+      <h2>Statistics</h2>
+      <div class="stats-container">
+        <div class="stat-card">
+          <h3>Total Children</h3>
+          <div class="stat-value" id="totalChildren">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Defaulters</h3>
+          <div class="stat-value" id="totalDefaulters">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Due Soon</h3>
+          <div class="stat-value" id="totalDueSoon">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Upcoming</h3>
+          <div class="stat-value" id="totalUpcoming">0</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 1.0: Registration Form -->
+    <section id="registration" class="no-print">
+      <h2>Register Child</h2>
+      <form id="registrationForm">
+        <label for="childName">Child's Name:</label>
+        <input type="text" id="childName" required>
+
+        <label for="dob">Date of Birth:</label>
+        <input type="date" id="dob" required>
+
+        <label for="sex">Sex:</label>
+        <select id="sex" required>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+
+        <label for="address">Address/Community:</label>
+        <input type="text" id="address" required>
+
+        <label for="contact">Contact (Optional):</label>
+        <input type="text" id="contact">
+
+        <button type="submit" id="registerChildBtn">
+          <span id="registerChildBtnText">Register</span>
+          <span id="registerChildSpinner" class="loading hidden"></span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Section 1.1: Child Health Register -->
+    <section id="childHealthRegister">
+      <h2>Child Health Register</h2>
+      <input type="text" id="search" placeholder="Search by name or reg no." oninput="filterChildren()" class="no-print">
+      <div style="overflow-x: auto;">
+        <table id="childTable">
+          <thead>
+            <tr>
+              <th>Reg No.</th>
+              <th>Name</th>
+              <th>DOB</th>
+              <th>Sex</th>
+              <th>Address</th>
+              <th>Contact</th>
+              <th class="no-print">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Rows will be populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div class="action-buttons no-print">
+        <button onclick="exportToCSV()">Export to CSV</button>
+        <button onclick="preparePrintRecords()">Print Records</button>
+        <button onclick="backupData()">Backup Data</button>
+        <input type="file" id="restoreFile" accept=".json" style="display: none;">
+        <button onclick="document.getElementById('restoreFile').click()">Restore Data</button>
+        <button onclick="clearAllData()" style="background-color: var(--ghs-red);">Clear All Data</button>
+        <button onclick="openHelpModal()">Help/Instructions</button>
+      </div>
+    </section>
+
+    <!-- Section 1.2: Dashboard -->
+    <section id="dashboard">
+      <h2>Dashboard</h2>
+      <div class="tab-container">
+        <div class="tab-buttons no-print">
+          <button class="tab-button active" onclick="openTab('allRecords')">All Records</button>
+          <button class="tab-button" onclick="openTab('defaulters')">Defaulters</button>
+          <button class="tab-button" onclick="openTab('dueSoon')">Due Soon (7 days)</button>
+          <button class="tab-button" onclick="openTab('upcoming')">Upcoming (30 days)</button>
+        </div>
+        
+        <div id="allRecords" class="tab-content active">
+          <div style="overflow-x: auto;">
+            <table id="allRecordsTable">
+              <thead>
+                <tr>
+                  <th>Reg No.</th>
+                  <th>Name</th>
+                  <th>Completed Vaccines</th>
+                  <th>Booked Vaccines</th>
+                  <th>Next Visit Date</th>
+                  <th>Status</th>
+                  <th class="no-print">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div id="defaulters" class="tab-content">
+          <div style="overflow-x: auto;">
+            <table id="defaultersTable">
+              <thead>
+                <tr>
+                  <th>Reg No.</th>
+                  <th>Name</th>
+                  <th>Missed Vaccine</th>
+                  <th>Missed Date</th>
+                  <th>Days Overdue</th>
+                  <th class="no-print">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div id="dueSoon" class="tab-content">
+          <div style="overflow-x: auto;">
+            <table id="dueSoonTable">
+              <thead>
+                <tr>
+                  <th>Reg No.</th>
+                  <th>Name</th>
+                  <th>Due Vaccine</th>
+                  <th>Due Date</th>
+                  <th>Days Remaining</th>
+                  <th class="no-print">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div id="upcoming" class="tab-content">
+          <div style="overflow-x: auto;">
+            <table id="upcomingTable">
+              <thead>
+                <tr>
+                  <th>Reg No.</th>
+                  <th>Name</th>
+                  <th>Scheduled Vaccine</th>
+                  <th>Scheduled Date</th>
+                  <th>Days Remaining</th>
+                  <th class="no-print">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Print Section (Hidden until needed) -->
+    <div id="printSection" class="hidden"></div>
+
+    <!-- Modal for Immunization Schedule -->
+    <div id="immunizationModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Immunization Schedule</h2>
+        <div style="overflow-x: auto;">
+          <table id="immunizationTable">
+            <thead>
+              <tr>
+                <th>Vaccine</th>
+                <th>Date Given</th>
+                <th>Batch Number</th>
+                <th>Place Given</th>
+                <th>Remarks</th>
+                <th>Next Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Rows will be populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+        <button onclick="promptToBookNextVisit()" id="saveImmunizationBtn">
+          <span id="saveImmunizationBtnText">Save</span>
+          <span id="saveImmunizationSpinner" class="loading hidden"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal for Booking Next Visit -->
+    <div id="bookingModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeBookingModal()">&times;</span>
+        <h2>Book Next Visit</h2>
+        <div class="booking-form">
+          <h3>Select Vaccines for Next Visit:</h3>
+          <div id="vaccineSelection">
+            <!-- Vaccine checkboxes will be populated dynamically -->
+          </div>
+          <label for="nextVisitDate">Next Visit Date:</label>
+          <input type="date" id="nextVisitDate" required>
+          <button onclick="saveBooking()" id="saveBookingBtn">
+            <span id="saveBookingBtnText">Confirm Booking</span>
+            <span id="saveBookingSpinner" class="loading hidden"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Viewing Records -->
+    <div id="viewRecordsModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeViewRecordsModal()">&times;</span>
+        <h2>View Immunization Records</h2>
+        <div>
+          <label for="selectChildren">Select Child(ren):</label>
+          <select id="selectChildren" multiple class="no-print">
+            <!-- Options will be populated dynamically -->
+          </select>
+          <button onclick="viewSelectedChildrenRecords()" class="no-print">View Records</button>
+        </div>
+        <div style="overflow-x: auto;">
+          <table id="viewRecordsTable">
+            <thead>
+              <tr>
+                <th>Reg No.</th>
+                <th>Name</th>
+                <th>Vaccine</th>
+                <th>Date Given</th>
+                <th>Batch Number</th>
+                <th>Place Given</th>
+                <th>Remarks</th>
+                <th>Next Visit</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Rows will be populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Editing Child Details -->
+    <div id="editChildModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeEditChildModal()">&times;</span>
+        <h2>Edit Child Details</h2>
+        <form id="editChildForm">
+          <label for="editChildName">Child's Name:</label>
+          <input type="text" id="editChildName" required>
+
+          <label for="editDob">Date of Birth:</label>
+          <input type="date" id="editDob" required>
+
+          <label for="editSex">Sex:</label>
+          <select id="editSex" required>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+
+          <label for="editAddress">Address/Community:</label>
+          <input type="text" id="editAddress" required>
+
+          <label for="editContact">Contact (Optional):</label>
+          <input type="text" id="editContact">
+
+          <button type="button" onclick="saveEditedChild()" id="saveEditChildBtn">
+            <span id="saveEditChildBtnText">Save Changes</span>
+            <span id="saveEditChildSpinner" class="loading hidden"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal for Help/Instructions -->
+    <div id="helpModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeHelpModal()">&times;</span>
+        <h2>Help/Instructions</h2>
+        <h3>Getting Started</h3>
+        <ol>
+          <li>Register a child using the registration form.</li>
+          <li>Update immunization records by clicking "Update" next to a child's name.</li>
+          <li>Use the dashboard tabs to view defaulters, due soon, or all records.</li>
+        </ol>
+        
+        <h3>Data Management</h3>
+        <ol>
+          <li>Export data to CSV for offline use or reporting.</li>
+          <li>Print records for physical filing or reference.</li>
+          <li>Backup and restore data using the respective buttons.</li>
+          <li>Clear all data if needed (use with caution).</li>
+        </ol>
+        
+        <h3>Immunization Process</h3>
+        <ol>
+          <li>When saving immunization records, you'll be prompted to book the next visit.</li>
+          <li>Select vaccines for the next visit and set the date in the booking form.</li>
+          <li>The system will automatically track defaulters and upcoming visits.</li>
+        </ol>
+        
+        <h3>Account Management</h3>
+        <ol>
+          <li>Each CHPS compound should have its own account.</li>
+          <li>Data is securely stored and only accessible to your facility.</li>
+          <li>Log out when using shared devices.</li>
+        </ol>
+
+        <h3>Offline Usage</h3>
+        <ol>
+          <li>First login requires internet connection.</li>
+          <li>After first login, you can access your data offline.</li>
+          <li>Changes made offline will sync when connection is restored.</li>
+          <li>Offline access is available for up to 7 days without reconnecting.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="no-print">
+      Developed By NASARE SURAJ | Ghana Health Service Immunization Tracker v1.3
+    </footer>
+
+    <!-- Notification Element -->
+    <div id="notification" class="notification hidden"></div>
+
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator" class="hidden">You are currently offline. Changes will sync when connection is restored.</div>
+  </div>
+
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmyxqzFXTrTp_XoJ7-95v2b3wOgsUqok8",
+      authDomain: "chps-immunization-tracker-app.firebaseapp.com",
+      projectId: "chps-immunization-tracker-app",
+      storageBucket: "chps-immunization-tracker-app.appspot.com",
+      messagingSenderId: "870794100953",
+      appId: "1:870794100953:web:bd31fa9c684c4fe8bf7ec8"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // Enable offline persistence
+    db.enablePersistence()
+      .catch((err) => {
+        if (err.code == 'failed-precondition') {
+          console.warn("Offline persistence can only be enabled in one tab at a time.");
+        } else if (err.code == 'unimplemented') {
+          console.warn("The current browser does not support offline persistence.");
+        }
+      });
+
+    // Global variables
+    let children = [];
+    let facilityName = '';
+    let unsavedVaccinations = {};
+    let editChildIndex = null;
+    let selectedChildIndex = null;
+    let currentUser = null;
+    let isOnline = navigator.onLine;
+    let offlineAuthData = null;
+
+    // Track online/offline status
+    window.addEventListener('online', () => {
+      isOnline = true;
+      document.getElementById('offlineIndicator').classList.add('hidden');
+      document.getElementById('offlineBadge').style.display = 'none';
+      showNotification('Connection restored. Syncing data...', 'success');
+      syncData();
+    });
+
+    window.addEventListener('offline', () => {
+      isOnline = false;
+      document.getElementById('offlineIndicator').classList.remove('hidden');
+      document.getElementById('offlineBadge').style.display = 'inline-block';
+      showNotification('You are offline. Changes will sync when connection is restored.', 'error');
+    });
+
+    // Show offline login message if needed
+    if (!isOnline) {
+      document.getElementById('offlineLoginMessage').style.display = 'block';
+    }
+
+    // Vaccination Schedule
+    const vaccinationSchedule = [
+      "BCG at Birth",
+      "OPV0 at Birth",
+      "Hepatitis B at Birth",
+      "OPV1 at 6 weeks",
+      "Penta1 at 6 weeks",
+      "PCV1 at 6 weeks",
+      "Rotavirus1 at 6 weeks",
+      "OPV2 at 10 weeks",
+      "Penta2 at 10 weeks",
+      "PCV2 at 10 weeks",
+      "Rotavirus2 at 10 weeks",
+      "OPV3 at 14 weeks",
+      "Penta3 at 14 weeks",
+      "PCV3 at 14 weeks",
+      "Rotavirus3 at 14 weeks",
+      "IPV1 at 14 weeks",
+      "Malaria1 at 6 months",
+      "Malaria2 at 7 months",
+      "IPV2 at 7 months",
+      "Malaria3 at 9 months",
+      "Measles Rubella1 at 9 months",
+      "Malaria4 at 18 months",
+      "Measles Rubella2 at 18 months",
+      "Men A at 18 months",
+      "Vitamin A at 6 months",
+      "Vitamin A at 12 months",
+      "Vitamin A at 18 months",
+      "Vitamin A at 24 months",
+      "Vitamin A at 30 months",
+      "Vitamin A at 36 months",
+      "Vitamin A at 42 months",
+      "Vitamin A at 48 months",
+      "Vitamin A at 54 months",
+      "Vitamin A at 60 months"
+    ];
+
+    // Show notification
+    function showNotification(message, type = 'success') {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.className = `notification ${type}`;
+      notification.classList.remove('hidden');
+      
+      setTimeout(() => {
+        notification.classList.add('hidden');
+      }, 5000);
+    }
+
+    // Modified auth state handler
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        // User is signed in (works offline if previously authenticated)
+        currentUser = user;
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('appContent').classList.remove('hidden');
+        
+        // Persist auth state for offline access
+        persistAuth();
+        
+        // Try to load data (will use cached data if offline)
+        loadUserData();
+        
+        // Show offline warning if needed
+        if (!isOnline) {
+          showNotification('You are offline. Using cached data.', 'error');
+          document.getElementById('offlineBadge').style.display = 'inline-block';
+        }
+      } else {
+        // User is signed out
+        if (!isOnline && localStorage.getItem('lastAuth')) {
+          // Try offline login with cached credentials
+          const authData = JSON.parse(localStorage.getItem('lastAuth'));
+          if (new Date().getTime() - authData.timestamp < 7 * 24 * 60 * 60 * 1000) {
+            currentUser = {
+              email: authData.email,
+              uid: authData.uid
+            };
+            document.getElementById('userEmail').textContent = authData.email;
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('appContent').classList.remove('hidden');
+            loadUserData();
+            document.getElementById('offlineBadge').style.display = 'inline-block';
+            showNotification('Using offline access with cached data', 'error');
+            return;
+          }
+        }
+        
+        currentUser = null;
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('appContent').classList.add('hidden');
+        showLoginForm();
+      }
+    });
+
+    // Persist auth state
+    function persistAuth() {
+      if (currentUser && isOnline) {
+        // Store basic auth info in localStorage for offline access
+        localStorage.setItem('lastAuth', JSON.stringify({
+          email: currentUser.email,
+          uid: currentUser.uid,
+          timestamp: new Date().getTime()
+        }));
+      }
+    }
+
+    // Login
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      toggleSpinner('loginBtnText', 'loginSpinner', true);
+      
+      try {
+        // Try online login first
+        if (isOnline) {
+          await auth.signInWithEmailAndPassword(email, password);
+        } else {
+          // Offline login attempt with cached credentials
+          const lastAuth = localStorage.getItem('lastAuth');
+          if (lastAuth) {
+            const authData = JSON.parse(lastAuth);
+            if (authData.email === email && new Date().getTime() - authData.timestamp < 7 * 24 * 60 * 60 * 1000) {
+              currentUser = {
+                email: authData.email,
+                uid: authData.uid
+              };
+              document.getElementById('userEmail').textContent = authData.email;
+              document.getElementById('authSection').classList.add('hidden');
+              document.getElementById('appContent').classList.remove('hidden');
+              loadUserData();
+              showNotification('Logged in with offline access', 'success');
+            } else {
+              showNotification('Cannot login offline without previous authentication', 'error');
+            }
+          } else {
+            showNotification('Internet connection required for first login', 'error');
+          }
+        }
+      } catch (error) {
+        showNotification('Login error: ' + error.message, 'error');
+      } finally {
+        toggleSpinner('loginBtnText', 'loginSpinner', false);
+      }
+    });
+
+    // Register
+    document.getElementById('registerForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const facility = document.getElementById('registerFacility').value;
+      
+      toggleSpinner('registerBtnText', 'registerSpinner', true);
+      
+      if (!isOnline) {
+        showNotification('Internet connection required for registration', 'error');
+        toggleSpinner('registerBtnText', 'registerSpinner', false);
+        return;
+      }
+      
+      auth.createUserWithEmailAndPassword(email, password)
+        .then(cred => {
+          // Save facility name to user's document
+          return db.collection('users').doc(cred.user.uid).set({
+            email: email,
+            facilityName: facility,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        })
+        .then(() => {
+          showNotification('Registration successful! You are now logged in.', 'success');
+        })
+        .catch(error => {
+          showNotification('Registration error: ' + error.message, 'error');
+          toggleSpinner('registerBtnText', 'registerSpinner', false);
+        });
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    
+    function logout() {
+      if (confirm('Are you sure you want to log out?')) {
+        // Clear offline auth data
+        localStorage.removeItem('lastAuth');
+        auth.signOut();
+      }
+    }
+
+    // Toggle spinner on buttons
+    function toggleSpinner(textId, spinnerId, show) {
+      const textElement = document.getElementById(textId);
+      const spinnerElement = document.getElementById(spinnerId);
+      
+      if (show) {
+        textElement.classList.add('hidden');
+        spinnerElement.classList.remove('hidden');
+      } else {
+        textElement.classList.remove('hidden');
+        spinnerElement.classList.add('hidden');
+      }
+    }
+
+    // Toggle between login and register forms
+    function showRegisterForm() {
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.remove('hidden');
+    }
+
+    function showLoginForm() {
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('hidden');
+    }
+
+    // Load user data from Firestore
+    function loadUserData() {
+      if (!currentUser) return;
+      
+      // Show sync status if online
+      if (isOnline) {
+        document.getElementById('syncStatus').classList.remove('hidden');
+      }
+      
+      // Load facility name
+      if (isOnline) {
+        db.collection('users').doc(currentUser.uid).get()
+          .then(doc => {
+            if (doc.exists) {
+              facilityName = doc.data().facilityName || '';
+              document.getElementById('facilityName').value = facilityName;
+              document.getElementById('facilityNameDisplay').textContent = facilityName;
+              localStorage.setItem('facilityName', facilityName);
+            }
+          });
+      } else {
+        // Load from cache if offline
+        facilityName = localStorage.getItem('facilityName') || '';
+        document.getElementById('facilityName').value = facilityName;
+        document.getElementById('facilityNameDisplay').textContent = facilityName;
+      }
+      
+      // Load children data
+      if (isOnline) {
+        db.collection('users').doc(currentUser.uid).collection('children').orderBy('name').get()
+          .then(querySnapshot => {
+            children = [];
+            querySnapshot.forEach(doc => {
+              children.push(doc.data());
+            });
+            // Cache children data
+            localStorage.setItem('childrenData', JSON.stringify(children));
+            updateChildTable();
+            updateStats();
+            updateAllTables();
+            document.getElementById('syncStatus').classList.add('hidden');
+            showNotification('Data loaded successfully', 'success');
+          })
+          .catch(error => {
+            document.getElementById('syncStatus').classList.add('hidden');
+            showNotification('Error loading data: ' + error.message, 'error');
+          });
+      } else {
+        // Load from cache if offline
+        const cachedData = localStorage.getItem('childrenData');
+        if (cachedData) {
+          children = JSON.parse(cachedData);
+          updateChildTable();
+          updateStats();
+          updateAllTables();
+          showNotification('Using cached data while offline', 'error');
+        } else {
+          showNotification('No cached data available for offline use', 'error');
+        }
+      }
+    }
+
+    // Sync data with Firestore
+    function syncData() {
+      if (!currentUser || !isOnline) return;
+      
+      document.getElementById('syncStatus').classList.remove('hidden');
+      document.getElementById('syncText').textContent = 'Syncing...';
+      
+      // Implement sync logic here
+      loadUserData();
+    }
+
+    // Save data to Firestore
+    function saveData() {
+      if (!currentUser) return;
+      
+      if (isOnline) {
+        document.getElementById('syncStatus').classList.remove('hidden');
+        document.getElementById('syncText').textContent = 'Saving...';
+        
+        // Save facility name
+        db.collection('users').doc(currentUser.uid).update({
+          facilityName: facilityName,
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+          document.getElementById('facilityNameDisplay').textContent = facilityName;
+          localStorage.setItem('facilityName', facilityName);
+          
+          // Save all children (this is not efficient for large datasets, consider updating only changed children)
+          const batch = db.batch();
+          children.forEach(child => {
+            // Use a sanitized ID for the document (replace slashes with dashes)
+            const sanitizedId = child.regNo.replace(/\//g, '-');
+            const childRef = db.collection('users').doc(currentUser.uid).collection('children').doc(sanitizedId);
+            batch.set(childRef, child);
+          });
+          
+          return batch.commit();
+        })
+        .then(() => {
+          // Update cache
+          localStorage.setItem('childrenData', JSON.stringify(children));
+          document.getElementById('syncStatus').classList.add('hidden');
+          showNotification('Data saved successfully', 'success');
+        })
+        .catch(error => {
+          document.getElementById('syncStatus').classList.add('hidden');
+          showNotification('Error saving data: ' + error.message, 'error');
+        });
+      } else {
+        // Save to cache when offline
+        localStorage.setItem('childrenData', JSON.stringify(children));
+        localStorage.setItem('facilityName', facilityName);
+        showNotification('Data saved locally. Will sync when online.', 'success');
+        
+        // Store pending writes
+        const pendingWrites = JSON.parse(localStorage.getItem('pendingWrites') || '[]');
+        pendingWrites.push({
+          type: 'fullUpdate',
+          data: children,
+          timestamp: new Date().getTime()
+        });
+        localStorage.setItem('pendingWrites', JSON.stringify(pendingWrites));
+      }
+    }
+
+    // Process pending writes when coming online
+    function processPendingWrites() {
+      if (!isOnline || !currentUser) return;
+      
+      const pendingWrites = JSON.parse(localStorage.getItem('pendingWrites') || '[]');
+      if (pendingWrites.length === 0) return;
+      
+      document.getElementById('syncStatus').classList.remove('hidden');
+      document.getElementById('syncText').textContent = 'Syncing offline changes...';
+      
+      const batch = db.batch();
+      pendingWrites.forEach(write => {
+        if (write.type === 'fullUpdate') {
+          write.data.forEach(child => {
+            // Use a sanitized ID for the document (replace slashes with dashes)
+            const sanitizedId = child.regNo.replace(/\//g, '-');
+            const childRef = db.collection('users').doc(currentUser.uid).collection('children').doc(sanitizedId);
+            batch.set(childRef, child);
+          });
+        }
+      });
+      
+      batch.commit()
+        .then(() => {
+          localStorage.removeItem('pendingWrites');
+          document.getElementById('syncStatus').classList.add('hidden');
+          showNotification('Offline changes synced successfully', 'success');
+          loadUserData();
+        })
+        .catch(error => {
+          document.getElementById('syncStatus').classList.add('hidden');
+          showNotification('Error syncing offline changes: ' + error.message, 'error');
+        });
+    }
+
+    // Save Facility Name
+    document.getElementById('facilityForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      toggleSpinner('saveFacilityBtnText', 'saveFacilitySpinner', true);
+      facilityName = document.getElementById('facilityName').value;
+      saveData();
+      toggleSpinner('saveFacilityBtnText', 'saveFacilitySpinner', false);
+    });
+
+    // Generate unique registration number
+    function generateRegNo() {
+      const year = new Date().getFullYear();
+      let count = children.filter(child => child.regNo.startsWith(year)).length + 1;
+      let regNo = `${String(count).padStart(3, '0')}/${year}`;
+
+      // Ensure the registration number is unique
+      while (children.some(child => child.regNo === regNo)) {
+        count++;
+        regNo = `${String(count).padStart(3, '0')}/${year}`;
+      }
+
+      return regNo;
+    }
+
+    // Register child
+    document.getElementById('registrationForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      toggleSpinner('registerChildBtnText', 'registerChildSpinner', true);
+
+      const childName = document.getElementById('childName').value.trim();
+      const dob = document.getElementById('dob').value;
+      const today = new Date();
+
+      // Check if child already exists
+      if (children.some(child => child.name.toLowerCase() === childName.toLowerCase())) {
+        showNotification('Child already registered.', 'error');
+        toggleSpinner('registerChildBtnText', 'registerChildSpinner', false);
+        return;
+      }
+
+      if (new Date(dob) > today) {
+        showNotification('Date of Birth cannot be in the future.', 'error');
+        toggleSpinner('registerChildBtnText', 'registerChildSpinner', false);
+        return;
+      }
+
+      const child = {
+        regNo: generateRegNo(),
+        name: childName,
+        dob: dob,
+        sex: document.getElementById('sex').value,
+        address: document.getElementById('address').value,
+        contact: document.getElementById('contact').value,
+        vaccinations: [],
+        isDefaulter: false,
+        createdAt: new Date().toISOString()
+      };
+
+      children.push(child);
+      saveData();
+      updateChildTable();
+      updateStats();
+      this.reset();
+      toggleSpinner('registerChildBtnText', 'registerChildSpinner', false);
+      showNotification('Child registered successfully!', 'success');
+    });
+
+    // Update Child Table
+    function updateChildTable(filteredChildren = children) {
+      const tbody = document.querySelector('#childTable tbody');
+      tbody.innerHTML = '';
+
+      if (filteredChildren.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No children found</td></tr>';
+        return;
+      }
+
+      filteredChildren.forEach((child, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${child.regNo}</td>
+          <td>${child.name}</td>
+          <td>${formatDate(child.dob)}</td>
+          <td>${child.sex}</td>
+          <td>${child.address}</td>
+          <td>${child.contact || 'N/A'}</td>
+          <td class="no-print">
+            <button onclick="openImmunizationModal(${index})">Update</button>
+            <button onclick="openEditChildModal(${index})">Edit</button>
+            <button onclick="deleteChild(${index})" style="background-color: var(--ghs-red);">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Open Edit Child Modal
+    function openEditChildModal(index) {
+      editChildIndex = index;
+      const modal = document.getElementById('editChildModal');
+      modal.style.display = 'flex';
+
+      const child = children[index];
+      document.getElementById('editChildName').value = child.name;
+      document.getElementById('editDob').value = child.dob;
+      document.getElementById('editSex').value = child.sex;
+      document.getElementById('editAddress').value = child.address;
+      document.getElementById('editContact').value = child.contact || '';
+    }
+
+    // Save Edited Child Details and close modal
+    function saveEditedChild() {
+      toggleSpinner('saveEditChildBtnText', 'saveEditChildSpinner', true);
+      
+      const child = children[editChildIndex];
+      child.name = document.getElementById('editChildName').value.trim();
+      child.dob = document.getElementById('editDob').value;
+      child.sex = document.getElementById('editSex').value;
+      child.address = document.getElementById('editAddress').value.trim();
+      child.contact = document.getElementById('editContact').value.trim();
+      child.updatedAt = new Date().toISOString();
+
+      saveData();
+      updateChildTable();
+      updateViewRecordsModal();
+      closeEditChildModal();
+      toggleSpinner('saveEditChildBtnText', 'saveEditChildSpinner', false);
+      showNotification('Child details updated successfully!', 'success');
+    }
+
+    // Close Edit Child Modal
+    function closeEditChildModal() {
+      document.getElementById('editChildModal').style.display = 'none';
+    }
+
+    // Open Immunization Modal
+    function openImmunizationModal(index) {
+      selectedChildIndex = index;
+      const modal = document.getElementById('immunizationModal');
+      modal.style.display = 'flex';
+
+      const tbody = document.querySelector('#immunizationTable tbody');
+      tbody.innerHTML = '';
+
+      const child = children[index];
+      const childKey = `${child.regNo}-${child.name}`;
+      unsavedVaccinations[childKey] = unsavedVaccinations[childKey] || {};
+
+      vaccinationSchedule.forEach(vaccine => {
+        const existingVaccine = child.vaccinations.find(v => v.vaccine === vaccine);
+        const unsavedDate = unsavedVaccinations[childKey][vaccine];
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${vaccine}</td>
+          <td><input type="date" class="dateGiven" value="${unsavedDate || existingVaccine?.dateGiven || ''}" onchange="trackUnsavedDate(this, '${childKey}', '${vaccine}')"></td>
+          <td><input type="text" class="batchNumber" value="${existingVaccine?.batchNumber || ''}" required></td>
+          <td><input type="text" class="placeGiven" value="${existingVaccine?.placeGiven || ''}" required></td>
+          <td><input type="text" class="remarks" value="${existingVaccine?.remarks || ''}" required></td>
+          <td>${formatDate(existingVaccine?.nextVisit) || 'N/A'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Track unsaved dates
+    function trackUnsavedDate(input, childKey, vaccine) {
+      if (!unsavedVaccinations[childKey]) {
+        unsavedVaccinations[childKey] = {};
+      }
+      unsavedVaccinations[childKey][vaccine] = input.value;
+    }
+
+    // Prompt to book next visit
+    function promptToBookNextVisit() {
+      const confirmation = confirm('Do you want to book the next visit for this child?');
+      if (confirmation) {
+        openBookingModal();
+      } else {
+        saveImmunization(false); // Save without booking next visit
+      }
+    }
+
+    // Open Booking Modal
+    function openBookingModal() {
+      const modal = document.getElementById('bookingModal');
+      modal.style.display = 'flex';
+
+      const child = children[selectedChildIndex];
+      const childKey = `${child.regNo}-${child.name}`;
+      const vaccineSelection = document.getElementById('vaccineSelection');
+      vaccineSelection.innerHTML = '';
+
+      // Get vaccines that haven't been given yet (including checking unsaved dates)
+      const givenVaccines = child.vaccinations
+        .filter(v => v.dateGiven)
+        .map(v => v.vaccine);
+      
+      // Also exclude vaccines with unsaved dates
+      const unsavedDates = unsavedVaccinations[childKey] || {};
+      const vaccinesWithUnsavedDates = Object.keys(unsavedDates).filter(v => unsavedDates[v]);
+      
+      // Get booked vaccines
+      const bookedVaccines = child.vaccinations
+        .filter(v => v.nextVisit && !v.dateGiven)
+        .map(v => v.vaccine);
+      
+      // Available vaccines are those not given, not booked, and not having unsaved dates
+      const availableVaccines = vaccinationSchedule.filter(v => 
+        !givenVaccines.includes(v) && 
+        !bookedVaccines.includes(v) &&
+        !vaccinesWithUnsavedDates.includes(v)
+      );
+
+      if (availableVaccines.length === 0) {
+        vaccineSelection.innerHTML = '<p>No vaccines available for booking.</p>';
+        document.getElementById('nextVisitDate').disabled = true;
+      } else {
+        availableVaccines.forEach(vaccine => {
+          const vaccineItem = document.createElement('div');
+          vaccineItem.className = 'vaccine-item';
+          vaccineItem.innerHTML = `
+            <input type="checkbox" class="vaccine-checkbox" id="vaccine-${vaccine}" value="${vaccine}">
+            <label for="vaccine-${vaccine}">${vaccine}</label>
+          `;
+          vaccineSelection.appendChild(vaccineItem);
+        });
+        document.getElementById('nextVisitDate').disabled = false;
+        
+        // Set default date to today + 1 month
+        const today = new Date();
+        const nextMonth = new Date(today.setMonth(today.getMonth() + 1));
+        const formattedDate = nextMonth.toISOString().split('T')[0];
+        document.getElementById('nextVisitDate').value = formattedDate;
+        document.getElementById('nextVisitDate').min = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    // Close Booking Modal
+    function closeBookingModal() {
+      document.getElementById('bookingModal').style.display = 'none';
+    }
+
+    // Save Booking
+    function saveBooking() {
+      toggleSpinner('saveBookingBtnText', 'saveBookingSpinner', true);
+      
+      const nextVisitDate = document.getElementById('nextVisitDate').value;
+      if (!nextVisitDate) {
+        showNotification('Please select a next visit date.', 'error');
+        toggleSpinner('saveBookingBtnText', 'saveBookingSpinner', false);
+        return;
+      }
+
+      const checkboxes = document.querySelectorAll('.vaccine-checkbox:checked');
+      if (checkboxes.length === 0) {
+        showNotification('Please select at least one vaccine for the next visit.', 'error');
+        toggleSpinner('saveBookingBtnText', 'saveBookingSpinner', false);
+        return;
+      }
+
+      // First save the immunization data without next visit dates
+      saveImmunization(true, nextVisitDate, Array.from(checkboxes).map(cb => cb.value));
+    }
+
+    // Save Immunization Data
+    function saveImmunization(bookNextVisit = false, nextVisitDate = null, nextVisitVaccines = []) {
+      toggleSpinner('saveImmunizationBtnText', 'saveImmunizationSpinner', true);
+      
+      const child = children[selectedChildIndex];
+      const childKey = `${child.regNo}-${child.name}`;
+      const rows = document.querySelectorAll('#immunizationTable tbody tr');
+
+      // Validate mandatory fields
+      let isValid = true;
+      rows.forEach(row => {
+        const dateGiven = row.querySelector('.dateGiven').value;
+        const batchNumber = row.querySelector('.batchNumber').value;
+        const placeGiven = row.querySelector('.placeGiven').value;
+        const remarks = row.querySelector('.remarks').value;
+
+        if (dateGiven && (!batchNumber || !placeGiven || !remarks)) {
+          isValid = false;
+          showNotification('Batch Number, Place Given, and Remarks are mandatory when Date Given is selected.', 'error');
+        }
+      });
+
+      if (!isValid) {
+        toggleSpinner('saveImmunizationBtnText', 'saveImmunizationSpinner', false);
+        return;
+      }
+
+      // Clear existing vaccinations
+      child.vaccinations = [];
+      
+      // Save all vaccination data
+      rows.forEach(row => {
+        const vaccine = row.cells[0].textContent;
+        const dateGiven = row.querySelector('.dateGiven').value;
+        const batchNumber = row.querySelector('.batchNumber').value;
+        const placeGiven = row.querySelector('.placeGiven').value;
+        const remarks = row.querySelector('.remarks').value;
+
+        if (dateGiven || batchNumber || placeGiven || remarks) {
+          child.vaccinations.push({
+            vaccine,
+            dateGiven,
+            batchNumber,
+            placeGiven,
+            remarks,
+            nextVisit: '', // We'll handle next visits separately
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      // If booking next visit, add next visit dates to selected vaccines
+      if (bookNextVisit && nextVisitDate && nextVisitVaccines.length > 0) {
+        nextVisitVaccines.forEach(vaccine => {
+          const existingVaccineIndex = child.vaccinations.findIndex(v => v.vaccine === vaccine);
+          if (existingVaccineIndex !== -1) {
+            child.vaccinations[existingVaccineIndex].nextVisit = nextVisitDate;
+          } else {
+            child.vaccinations.push({
+              vaccine,
+              dateGiven: '',
+              batchNumber: '',
+              placeGiven: '',
+              remarks: '',
+              nextVisit: nextVisitDate,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        });
+      }
+
+      // Clear unsaved dates for this child
+      if (unsavedVaccinations[childKey]) {
+        delete unsavedVaccinations[childKey];
+      }
+
+      // Update defaulter status based on next visit dates
+      updateDefaulterStatus(child);
+      
+      saveData();
+      closeModal();
+      closeBookingModal();
+      updateChildTable();
+      updateStats();
+      updateAllTables();
+      toggleSpinner('saveImmunizationBtnText', 'saveImmunizationSpinner', false);
+      showNotification('Immunization data saved successfully!', 'success');
+    }
+
+    // Update Defaulter Status
+    function updateDefaulterStatus(child) {
+      const today = new Date();
+      child.isDefaulter = child.vaccinations.some(vaccination => {
+        if (!vaccination.nextVisit) return false;
+        const nextVisitDate = new Date(vaccination.nextVisit);
+        return nextVisitDate < today;
+      });
+      child.updatedAt = new Date().toISOString();
+    }
+
+    // Close Modal
+    function closeModal() {
+      const modal = document.getElementById('immunizationModal');
+      modal.style.display = 'none';
+    }
+
+    // Close View Records Modal
+    function closeViewRecordsModal() {
+      const modal = document.getElementById('viewRecordsModal');
+      modal.style.display = 'none';
+    }
+
+    // Close Help Modal
+    function closeHelpModal() {
+      const modal = document.getElementById('helpModal');
+      modal.style.display = 'none';
+    }
+
+    // Delete Child
+    function deleteChild(index) {
+      if (confirm('Are you sure you want to delete this child? This action cannot be undone.')) {
+        const child = children[index];
+        
+        if (isOnline) {
+          // Remove from Firestore if online
+          const sanitizedId = child.regNo.replace(/\//g, '-');
+          db.collection('users').doc(currentUser.uid).collection('children').doc(sanitizedId).delete()
+            .then(() => {
+              // Remove from local array
+              children.splice(index, 1);
+              saveData(); // This will update local cache
+              updateChildTable();
+              updateViewRecordsModal();
+              updateStats();
+              updateAllTables();
+              showNotification('Child deleted successfully', 'success');
+            })
+            .catch(error => {
+              showNotification('Error deleting child: ' + error.message, 'error');
+            });
+        } else {
+          // Offline delete - mark for deletion
+          child._deleted = true;
+          children.splice(index, 1);
+          saveData(); // This will update local cache
+          updateChildTable();
+          updateViewRecordsModal();
+          updateStats();
+          updateAllTables();
+          showNotification('Child marked for deletion. Will be removed from server when online.', 'success');
+        }
+      }
+    }
+
+    // Filter Children
+    function filterChildren() {
+      const searchTerm = document.getElementById('search').value.toLowerCase();
+      const filteredChildren = children.filter(child =>
+        child.name.toLowerCase().includes(searchTerm) || child.regNo.includes(searchTerm)
+      );
+      updateChildTable(filteredChildren);
+    }
+
+    // Export to CSV
+    function exportToCSV() {
+      const headers = ["Reg No.", "Name", "Vaccine", "Date Given", "Next Visit", "Status"];
+      const data = [];
+
+      // Add all vaccination records to CSV
+      children.forEach(child => {
+        if (child._deleted) return; // Skip deleted records
+        
+        child.vaccinations.forEach(vaccination => {
+          const today = new Date();
+          let status = 'Upcoming';
+          
+          if (vaccination.dateGiven) {
+            status = 'Completed';
+          } else if (vaccination.nextVisit) {
+            const nextVisitDate = new Date(vaccination.nextVisit);
+            if (nextVisitDate < today) {
+              const daysOverdue = Math.floor((today - nextVisitDate) / (1000 * 60 * 60 * 24));
+              status = `Overdue (${daysOverdue} days)`;
+            } else {
+              const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+              status = `Due in ${daysUntil} days`;
+            }
+          }
+
+          data.push([
+            child.regNo,
+            child.name,
+            vaccination.vaccine,
+            formatDate(vaccination.dateGiven) || 'N/A',
+            formatDate(vaccination.nextVisit) || 'N/A',
+            status
+          ]);
+        });
+      });
+
+      const csvContent = "data:text/csv;charset=utf-8," +
+        [headers, ...data].map(row => row.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `immunization_records_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showNotification('CSV export started', 'success');
+    }
+
+    // Prepare records for printing
+    function preparePrintRecords() {
+      const printSection = document.getElementById('printSection');
+      printSection.innerHTML = '';
+      
+      // Create a title
+      const title = document.createElement('h1');
+      title.textContent = `Immunization Records - ${facilityName}`;
+      printSection.appendChild(title);
+      
+      // Create a subtitle with date
+      const subtitle = document.createElement('h2');
+      subtitle.textContent = `Generated on: ${new Date().toLocaleDateString()}`;
+      printSection.appendChild(subtitle);
+      
+      // Create a table for printing
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      
+      // Create table header
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th style="border: 1px solid #000; padding: 8px;">Reg No.</th>
+          <th style="border: 1px solid #000; padding: 8px;">Name</th>
+          <th style="border: 1px solid #000; padding: 8px;">DOB</th>
+          <th style="border: 1px solid #000; padding: 8px;">Sex</th>
+          <th style="border: 1px solid #000; padding: 8px;">Address</th>
+          <th style="border: 1px solid #000; padding: 8px;">Contact</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+      
+      // Create table body
+      const tbody = document.createElement('tbody');
+      children.forEach(child => {
+        if (child._deleted) return; // Skip deleted records
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td style="border: 1px solid #000; padding: 8px;">${child.regNo}</td>
+          <td style="border: 1px solid #000; padding: 8px;">${child.name}</td>
+          <td style="border: 1px solid #000; padding: 8px;">${formatDate(child.dob)}</td>
+          <td style="border: 1px solid #000; padding: 8px;">${child.sex}</td>
+          <td style="border: 1px solid #000; padding: 8px;">${child.address}</td>
+          <td style="border: 1px solid #000; padding: 8px;">${child.contact || 'N/A'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      printSection.appendChild(table);
+      
+      // Print the prepared section
+      window.print();
+    }
+
+    // Backup Data
+    function backupData() {
+      const data = {
+        facilityName: facilityName,
+        children: children.filter(child => !child._deleted), // Exclude deleted records
+        exportedAt: new Date().toISOString()
+      };
+      
+      const dataStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `immunization_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showNotification('Backup downloaded successfully', 'success');
+    }
+
+    // Restore Data
+    document.getElementById('restoreFile').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (confirm('Are you sure you want to restore this backup? All current data will be replaced.')) {
+              if (data.facilityName && data.children) {
+                facilityName = data.facilityName;
+                children = data.children;
+                saveData();
+                updateChildTable();
+                updateStats();
+                updateAllTables();
+                showNotification('Data restored successfully', 'success');
+              } else {
+                showNotification('Invalid backup file format', 'error');
+              }
+            }
+          } catch (error) {
+            showNotification('Invalid backup file. Please upload a valid JSON file.', 'error');
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Clear All Data
+    function clearAllData() {
+      if (confirm('ARE YOU ABSOLUTELY SURE YOU WANT TO CLEAR ALL DATA?\n\nThis action cannot be undone and will permanently delete all children records.')) {
+        if (isOnline) {
+          // Delete all children from Firestore if online
+          const batch = db.batch();
+          children.forEach(child => {
+            const sanitizedId = child.regNo.replace(/\//g, '-');
+            const childRef = db.collection('users').doc(currentUser.uid).collection('children').doc(sanitizedId);
+            batch.delete(childRef);
+          });
+          
+          batch.commit()
+            .then(() => {
+              children = [];
+              saveData(); // This will clear local cache
+              updateChildTable();
+              updateStats();
+              updateAllTables();
+              showNotification('All data has been cleared', 'success');
+            })
+            .catch(error => {
+              showNotification('Error clearing data: ' + error.message, 'error');
+            });
+        } else {
+          // Offline clear
+          children = [];
+          saveData(); // This will clear local cache
+          updateChildTable();
+          updateStats();
+          updateAllTables();
+          showNotification('All local data has been cleared', 'success');
+        }
+      }
+    }
+
+    // Open Help Modal
+    function openHelpModal() {
+      document.getElementById('helpModal').style.display = 'flex';
+    }
+
+    // View All Records
+    document.getElementById('viewAll').addEventListener('click', () => {
+      const modal = document.getElementById('viewRecordsModal');
+      modal.style.display = 'flex';
+
+      const select = document.getElementById('selectChildren');
+      select.innerHTML = children
+        .filter(child => !child._deleted) // Exclude deleted records
+        .map((child, index) => `
+          <option value="${index}">${child.regNo} - ${child.name}</option>
+        `).join('');
+    });
+
+    // View Selected Children Records
+    function viewSelectedChildrenRecords() {
+      const select = document.getElementById('selectChildren');
+      const selectedIndices = Array.from(select.selectedOptions).map(option => option.value);
+
+      const tbody = document.querySelector('#viewRecordsTable tbody');
+      tbody.innerHTML = '';
+
+      if (selectedIndices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">Please select at least one child</td></tr>';
+        return;
+      }
+
+      selectedIndices.forEach(index => {
+        const child = children[index];
+        if (child._deleted) return; // Skip deleted records
+        
+        const firstRow = document.createElement('tr');
+        firstRow.innerHTML = `
+          <td>${child.regNo}</td>
+          <td>${child.name}</td>
+          <td colspan="7"></td>
+        `;
+        tbody.appendChild(firstRow);
+
+        child.vaccinations.forEach(vaccination => {
+          const today = new Date();
+          let status = 'Upcoming';
+          let rowClass = '';
+          
+          if (vaccination.dateGiven) {
+            status = 'Completed';
+          } else if (vaccination.nextVisit) {
+            const nextVisitDate = new Date(vaccination.nextVisit);
+            if (nextVisitDate < today) {
+              const daysOverdue = Math.floor((today - nextVisitDate) / (1000 * 60 * 60 * 24));
+              status = `Overdue (${daysOverdue} days)`;
+              rowClass = 'highlight-red';
+            } else {
+              const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+              if (daysUntil <= 7) {
+                status = `Due in ${daysUntil} days`;
+                rowClass = 'highlight-yellow';
+              } else {
+                status = `Due in ${daysUntil} days`;
+              }
+            }
+          }
+
+          const row = document.createElement('tr');
+          if (rowClass) row.className = rowClass;
+          row.innerHTML = `
+            <td></td>
+            <td></td>
+            <td>${vaccination.vaccine}</td>
+            <td>${formatDate(vaccination.dateGiven) || 'N/A'}</td>
+            <td>${vaccination.batchNumber || 'N/A'}</td>
+            <td>${vaccination.placeGiven || 'N/A'}</td>
+            <td>${vaccination.remarks || 'N/A'}</td>
+            <td>${formatDate(vaccination.nextVisit) || 'N/A'}</td>
+            <td>${status}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
+    }
+
+    // Format date to DD/MM/YYYY
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+
+    // Update All Tables
+    function updateAllTables() {
+      updateAllRecordsTable();
+      updateDefaultersTable();
+      updateDueSoonTable();
+      updateUpcomingTable();
+    }
+
+    // Update All Records Table - Now shows each child only once with summary info
+    function updateAllRecordsTable() {
+      const tbody = document.querySelector('#allRecordsTable tbody');
+      tbody.innerHTML = '';
+
+      const activeChildren = children.filter(child => !child._deleted);
+      
+      if (activeChildren.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No children found</td></tr>';
+        return;
+      }
+
+      activeChildren.forEach((child, index) => {
+        const today = new Date();
+        
+        // Get completed vaccines
+        const completedVaccines = child.vaccinations
+          .filter(v => v.dateGiven)
+          .map(v => v.vaccine.split(' at ')[0])
+          .join(', ');
+        
+        // Get booked vaccines with next visit dates
+        const bookedVaccines = child.vaccinations
+          .filter(v => v.nextVisit && !v.dateGiven)
+          .map(v => ({
+            vaccine: v.vaccine.split(' at ')[0],
+            nextVisit: v.nextVisit
+          }));
+        
+        // Find the earliest next visit date
+        const nextVisitDates = bookedVaccines.map(v => new Date(v.nextVisit));
+        const earliestNextVisit = nextVisitDates.length > 0 ? 
+          new Date(Math.min(...nextVisitDates)) : null;
+        
+        // Determine status
+        let status = 'Up to date';
+        let rowClass = '';
+        
+        if (bookedVaccines.length > 0) {
+          if (earliestNextVisit < today) {
+            const daysOverdue = Math.floor((today - earliestNextVisit) / (1000 * 60 * 60 * 24));
+            status = `Overdue (${daysOverdue} days)`;
+            rowClass = 'highlight-red';
+          } else {
+            const daysUntil = Math.ceil((earliestNextVisit - today) / (1000 * 60 * 60 * 24));
+            if (daysUntil <= 7) {
+              status = `Due in ${daysUntil} days`;
+              rowClass = 'highlight-yellow';
+            } else {
+              status = `Due in ${daysUntil} days`;
+            }
+          }
+        }
+
+        const row = document.createElement('tr');
+        if (rowClass) row.className = rowClass;
+        row.innerHTML = `
+          <td>${child.regNo}</td>
+          <td>${child.name}</td>
+          <td>${completedVaccines || 'None'}</td>
+          <td>${bookedVaccines.map(v => `${v.vaccine}`).join(', ') || 'None'}</td>
+          <td>${earliestNextVisit ? formatDate(earliestNextVisit) : 'N/A'}</td>
+          <td>${status}</td>
+          <td class="no-print"><button onclick="openImmunizationModal(${children.indexOf(child)})">Update</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Update Defaulters Table - Now counts each child only once
+    function updateDefaultersTable() {
+      const today = new Date();
+      const defaultersList = [];
+      const countedChildren = new Set(); // Track children we've already counted
+      
+      // Find all defaulters (children with missed Next Visit dates)
+      children.forEach(child => {
+        if (child._deleted || countedChildren.has(child.regNo)) return; // Skip deleted or already counted
+        
+        const missedVaccines = child.vaccinations.filter(v => {
+          if (v.nextVisit && !v.dateGiven) {
+            const nextVisitDate = new Date(v.nextVisit);
+            return nextVisitDate < today;
+          }
+          return false;
+        });
+        
+        if (missedVaccines.length > 0) {
+          countedChildren.add(child.regNo); // Mark this child as counted
+          
+          // Find the most overdue vaccine for this child
+          const mostOverdue = missedVaccines.reduce((prev, current) => {
+            const prevDate = new Date(prev.nextVisit);
+            const currentDate = new Date(current.nextVisit);
+            return prevDate < currentDate ? prev : current;
+          });
+          
+          const nextVisitDate = new Date(mostOverdue.nextVisit);
+          const daysOverdue = Math.floor((today - nextVisitDate) / (1000 * 60 * 60 * 24));
+          
+          defaultersList.push({
+            child,
+            vaccination: mostOverdue,
+            daysOverdue
+          });
+        }
+      });
+
+      const tbody = document.querySelector('#defaultersTable tbody');
+      tbody.innerHTML = defaultersList.map(defaulter => {
+        return `
+          <tr>
+            <td>${defaulter.child.regNo}</td>
+            <td>${defaulter.child.name}</td>
+            <td>${defaulter.vaccination.vaccine.split(' at ')[0]}</td>
+            <td class="highlight-red">${formatDate(defaulter.vaccination.nextVisit)}</td>
+            <td class="highlight-red">${defaulter.daysOverdue}</td>
+            <td class="no-print"><button onclick="openImmunizationModal(${children.indexOf(defaulter.child)})">Update</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      if (defaultersList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No defaulters found</td></tr>';
+      }
+    }
+
+    // Update Due Soon Table (7 days)
+    function updateDueSoonTable() {
+      const today = new Date();
+      const dueSoonList = [];
+      const countedChildren = new Set(); // Track children we've already counted
+      
+      // Find all vaccines due in the next 7 days
+      children.forEach(child => {
+        if (child._deleted || countedChildren.has(child.regNo)) return; // Skip deleted or already counted
+        
+        const dueSoonVaccines = child.vaccinations.filter(v => {
+          if (v.nextVisit && !v.dateGiven) {
+            const nextVisitDate = new Date(v.nextVisit);
+            const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+            return daysUntil > 0 && daysUntil <= 7;
+          }
+          return false;
+        });
+        
+        if (dueSoonVaccines.length > 0) {
+          countedChildren.add(child.regNo); // Mark this child as counted
+          
+          // Find the vaccine with the closest due date
+          const closestDue = dueSoonVaccines.reduce((prev, current) => {
+            const prevDate = new Date(prev.nextVisit);
+            const currentDate = new Date(current.nextVisit);
+            return prevDate < currentDate ? prev : current;
+          });
+          
+          const nextVisitDate = new Date(closestDue.nextVisit);
+          const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+          
+          dueSoonList.push({
+            child,
+            vaccination: closestDue,
+            daysUntil
+          });
+        }
+      });
+
+      const tbody = document.querySelector('#dueSoonTable tbody');
+      tbody.innerHTML = dueSoonList.map(item => {
+        return `
+          <tr>
+            <td>${item.child.regNo}</td>
+            <td>${item.child.name}</td>
+            <td>${item.vaccination.vaccine.split(' at ')[0]}</td>
+            <td class="highlight-yellow">${formatDate(item.vaccination.nextVisit)}</td>
+            <td class="highlight-yellow">${item.daysUntil}</td>
+            <td class="no-print"><button onclick="openImmunizationModal(${children.indexOf(item.child)})">Update</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      if (dueSoonList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No vaccines due in the next 7 days</td></tr>';
+      }
+    }
+
+    // Update Upcoming Table (30 days)
+    function updateUpcomingTable() {
+      const today = new Date();
+      const upcomingList = [];
+      const countedChildren = new Set(); // Track children we've already counted
+      
+      // Find all vaccines due in the next 30 days (but more than 7 days)
+      children.forEach(child => {
+        if (child._deleted || countedChildren.has(child.regNo)) return; // Skip deleted or already counted
+        
+        const upcomingVaccines = child.vaccinations.filter(v => {
+          if (v.nextVisit && !v.dateGiven) {
+            const nextVisitDate = new Date(v.nextVisit);
+            const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+            return daysUntil > 7 && daysUntil <= 30;
+          }
+          return false;
+        });
+        
+        if (upcomingVaccines.length > 0) {
+          countedChildren.add(child.regNo); // Mark this child as counted
+          
+          // Find the vaccine with the closest due date
+          const closestDue = upcomingVaccines.reduce((prev, current) => {
+            const prevDate = new Date(prev.nextVisit);
+            const currentDate = new Date(current.nextVisit);
+            return prevDate < currentDate ? prev : current;
+          });
+          
+          const nextVisitDate = new Date(closestDue.nextVisit);
+          const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+          
+          upcomingList.push({
+            child,
+            vaccination: closestDue,
+            daysUntil
+          });
+        }
+      });
+
+      const tbody = document.querySelector('#upcomingTable tbody');
+      tbody.innerHTML = upcomingList.map(item => {
+        return `
+          <tr>
+            <td>${item.child.regNo}</td>
+            <td>${item.child.name}</td>
+            <td>${item.vaccination.vaccine.split(' at ')[0]}</td>
+            <td>${formatDate(item.vaccination.nextVisit)}</td>
+            <td>${item.daysUntil}</td>
+            <td class="no-print"><button onclick="openImmunizationModal(${children.indexOf(item.child)})">Update</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      if (upcomingList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No vaccines due in the next 30 days</td></tr>';
+      }
+    }
+
+    // Update Stats - Now counts each child only once
+    function updateStats() {
+      const today = new Date();
+      let defaulterCount = 0;
+      let dueSoonCount = 0;
+      let upcomingCount = 0;
+      const countedDefaulters = new Set();
+      const countedDueSoon = new Set();
+      const countedUpcoming = new Set();
+      
+      children.forEach(child => {
+        if (child._deleted) return; // Skip deleted records
+        
+        let isDefaulter = false;
+        let isDueSoon = false;
+        let isUpcoming = false;
+        
+        child.vaccinations.forEach(vaccination => {
+          if (vaccination.nextVisit && !vaccination.dateGiven) {
+            const nextVisitDate = new Date(vaccination.nextVisit);
+            if (nextVisitDate < today) {
+              isDefaulter = true;
+            } else {
+              const daysUntil = Math.ceil((nextVisitDate - today) / (1000 * 60 * 60 * 24));
+              if (daysUntil <= 7) {
+                isDueSoon = true;
+              } else if (daysUntil <= 30) {
+                isUpcoming = true;
+              }
+            }
+          }
+        });
+        
+        if (isDefaulter) defaulterCount++;
+        if (isDueSoon) dueSoonCount++;
+        if (isUpcoming) upcomingCount++;
+      });
+      
+      document.getElementById('totalChildren').textContent = children.filter(child => !child._deleted).length;
+      document.getElementById('totalDefaulters').textContent = defaulterCount;
+      document.getElementById('totalDueSoon').textContent = dueSoonCount;
+      document.getElementById('totalUpcoming').textContent = upcomingCount;
+    }
+
+    // Tab Navigation
+    function openTab(tabId) {
+      // Hide all tab contents
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // Deactivate all tab buttons
+      document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+      });
+      
+      // Activate the selected tab
+      document.getElementById(tabId).classList.add('active');
+      
+      // Activate the button for the selected tab
+      event.currentTarget.classList.add('active');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check if we have cached auth data
+      const lastAuth = localStorage.getItem('lastAuth');
+      if (lastAuth) {
+        const authData = JSON.parse(lastAuth);
+        // If within 7 days of last auth
+        if (new Date().getTime() - authData.timestamp < 7 * 24 * 60 * 60 * 1000) {
+          // Show offline login message
+          document.getElementById('offlineLoginMessage').style.display = 'block';
+        }
+      }
+      
+      updateStats();
+      updateChildTable();
+      updateAllTables();
+    });
+
+    // Process pending writes when coming online
+    window.addEventListener('online', processPendingWrites);
+  </script>
+</body>
+</html>
